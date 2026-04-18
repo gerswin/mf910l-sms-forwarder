@@ -3,6 +3,38 @@
 Forwards incoming SMS from a ZTE MF910L router to an HTTP(S) webhook (e.g. n8n).
 Runs on-device under BusyBox 1.18.5.
 
+## Historia
+
+Llevo años con la misma idea rondando: convertir un módem 4G viejo en un
+reenviador de SMS.
+
+Lo intenté primero con teléfonos Android. SMS Gateway, SMS Sync, y un par de
+apps propias que escribí yo mismo. Todas funcionan los primeros días. Después
+el sistema decide que tu app consume mucha batería, la mete en "optimización",
+y a las 6 horas ya no reenvía nada. Vuelves a abrirla, das permisos otra vez,
+la "fijas" en memoria, ignoras las advertencias del fabricante. Dura otros
+días. Se repite.
+
+Android nunca fue hecho para correr un daemon 24/7. Pelear contra el power
+saving es pelear contra el propio OS.
+
+Así que agarré un router ZTE MF910L que tenía en un cajón, lo rooteé, y le
+metí 4 scripts de shell corriendo directo sobre BusyBox. Sin Android, sin
+Doze, sin battery optimizer decidiendo por mí cuándo "ahorrar recursos". El
+módem arranca, el init ejecuta el forwarder, y se queda ahí hasta que lo
+desenchufe.
+
+La motivación concreta: una prueba de concepto que valida pagos móviles en
+tiempo real. El banco manda SMS cuando entra plata, el webhook lo parsea,
+cruza contra la orden pendiente, y confirma. Sin integración bancaria, sin
+Open Banking, sin esperar pantallazo del cliente por WhatsApp.
+
+Honestidad: al momento de publicar esto lleva 3 días corriendo. Es poco
+tiempo para decir "esto funciona". Pero ya sobrevivió un reboot del router
+y un corte de energía, cosa que mis apps Android nunca lograron aguantar
+limpio. Señal buena por ahora. Cuando tenga 30 días de uptime real actualizo
+este README con el veredicto.
+
 ## Files
 
 - `sms_forward.sh` — polls router web API, decodes UCS-2 hex, POSTs JSON.
