@@ -3,6 +3,9 @@
 !.env.example
 sms_forward.env
 sms_forwarded_ids.txt
+sms_retry.txt
+sms_stats.txt
+sms_stats.txt.*
 sms_forward.log
 *.log
 .DS_Store

@@ -111,10 +111,51 @@ adb shell /etc/init.d/sms_forward start
 All config via env file at `/data/sms_forward.env` (override path with `SMS_ENV_FILE`).
 Required: `WEBHOOK_URL`, `PASS_B64`. See `.env.example`.
 
+## Features
+
+- Polls both SIM (`mem_store=1`) and module memory (`mem_store=0`).
+- Deletes SMS from the router after successful forward, so the inbox never
+  fills up. Toggle with `DELETE_AFTER_FORWARD=0`.
+- Retries per-message up to `MAX_RETRIES` (default 5) on webhook failure;
+  after that the ID is marked seen and skipped.
+- UCS-2 decoding handles surrogate pairs (emoji, characters above U+FFFF).
+- JSON escape handles control chars (`\b`, `\f`, `\r`, `\t`, strips other
+  C0 control bytes to guarantee valid JSON).
+- Optional HMAC-SHA256 signing: set `HMAC_SECRET` and the forwarder adds
+  `X-Signature: sha256=<hex>` over the raw request body. Requires `openssl`
+  on the router.
+- Emits counters to `/data/sms_stats.txt` (forwarded, failed, deleted,
+  gaveup, relogin, uptime_loops).
+- Rotates `SEEN` and log files by line count.
+
 ## Webhook payload
 
 ```json
-{"id":"12","number":"+34600000000","date":"25,04,18,10,30,00,+08","content":"hello"}
+{
+  "id": "12",
+  "store": "1",
+  "number": "+34600000000",
+  "date": "25,04,18,10,30,00,+08",
+  "iso_date": "2025-04-18T10:30:00+08:00",
+  "content": "Tu código es 847291"
+}
+```
+
+`store` is `"1"` for SIM, `"0"` for module memory. `date` is the raw ZTE
+format; `iso_date` is the normalized ISO-8601 equivalent.
+
+### Verifying the HMAC signature (receiver side, Node.js example)
+
+```js
+const crypto = require('crypto');
+const got = req.headers['x-signature']; // "sha256=abcdef..."
+const expected = 'sha256=' + crypto
+  .createHmac('sha256', process.env.HMAC_SECRET)
+  .update(req.rawBody)
+  .digest('hex');
+if (!crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected))) {
+  return res.status(401).end();
+}
 ```
 
 ## Ops
@@ -122,4 +163,5 @@ Required: `WEBHOOK_URL`, `PASS_B64`. See `.env.example`.
 ```sh
 /etc/init.d/sms_forward status
 tail -f /data/sms_forward.log
+cat /data/sms_stats.txt       # current counters
 ```
