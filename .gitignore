@@ -1,0 +1,9 @@
+.env
+*.env
+!.env.example
+sms_forward.env
+sms_forwarded_ids.txt
+sms_forward.log
+*.log
+.DS_Store
+.claude/
