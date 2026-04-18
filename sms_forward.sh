@@ -12,6 +12,13 @@ SEEN="${SEEN:-/data/sms_forwarded_ids.txt}"
 LOG="${LOG:-/data/sms_forward.log}"
 INTERVAL="${INTERVAL:-30}"
 API="${API:-http://127.0.0.1}"
+# Rotation caps (lines). Prevent /data fill-up on long uptime.
+SEEN_MAX="${SEEN_MAX:-1000}"
+SEEN_KEEP="${SEEN_KEEP:-500}"
+LOG_MAX="${LOG_MAX:-2000}"
+LOG_KEEP="${LOG_KEEP:-1000}"
+# Force session refresh every N iterations (defends against silent cookie expiry).
+RELOGIN_EVERY="${RELOGIN_EVERY:-60}"
 REF_HDR="Referer: $API/index.html"
 XRW_HDR="X-Requested-With: XMLHttpRequest"
 
@@ -19,6 +26,14 @@ touch "$SEEN"
 
 logmsg() {
   echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"
+}
+
+rotate_file() {
+  F="$1"; MAX="$2"; KEEP="$3"
+  [ -f "$F" ] || return 0
+  LINES=$(wc -l < "$F" 2>/dev/null)
+  [ -n "$LINES" ] && [ "$LINES" -gt "$MAX" ] || return 0
+  tail -n "$KEEP" "$F" > "$F.tmp" && mv "$F.tmp" "$F"
 }
 
 do_login() {
@@ -153,12 +168,22 @@ parse_and_forward() {
 logmsg "starting forwarder pid=$$"
 do_login
 
+LOOP=0
 while :; do
+  LOOP=$((LOOP + 1))
+  if [ "$RELOGIN_EVERY" -gt 0 ] && [ $((LOOP % RELOGIN_EVERY)) -eq 0 ]; then
+    do_login
+    logmsg "periodic relogin loop=$LOOP"
+  fi
   RAW=$(fetch_sms)
   case "$RAW" in
     *'"messages"'*'"id"'*) parse_and_forward "$RAW" ;;
     *'"messages"'*) : ;;
     *) logmsg "bad response, relogin"; do_login ;;
   esac
+  if [ $((LOOP % 20)) -eq 0 ]; then
+    rotate_file "$SEEN" "$SEEN_MAX" "$SEEN_KEEP"
+    rotate_file "$LOG"  "$LOG_MAX"  "$LOG_KEEP"
+  fi
   sleep "$INTERVAL"
 done
