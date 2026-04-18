@@ -11,6 +11,47 @@ Runs on-device under BusyBox 1.18.5.
 - `adb_persist.sh` — forces ADB USB composition at boot.
 - `.env.example` — config template.
 
+## Requirements
+
+**Device must be rooted with ADB enabled.** Stock MF910L firmware blocks shell
+access. Writes to `/data` and `/etc/init.d` and a working `adb shell` as root
+are required.
+
+### Rooting / enabling ADB on MF910L
+
+Stock firmware exposes a diagnostic USB composition that can be flipped to
+include `adb`. One-time procedure from a host PC (device connected via USB):
+
+```sh
+# 1. Enable engineer/diag mode via hidden web endpoint
+#    (router must be on 192.168.0.1, admin session logged in)
+PASS_B64=$(printf 'Admin' | base64)   # your router password, base64
+curl -s -c cookies.txt \
+  -H "Referer: http://192.168.0.1/index.html" \
+  -H "X-Requested-With: XMLHttpRequest" \
+  --data "isTest=false&goformId=LOGIN&password=$PASS_B64" \
+  http://192.168.0.1/goform/goform_set_cmd_process
+
+# 2. Switch USB composition to include ADB (usb_mode=6)
+curl -s -b cookies.txt \
+  -H "Referer: http://192.168.0.1/index.html" \
+  -H "X-Requested-With: XMLHttpRequest" \
+  --data "isTest=false&goformId=USB_MODE_SWITCH&usb_mode=6" \
+  http://192.168.0.1/goform/goform_set_cmd_process
+
+# 3. Re-plug USB. Host should now see adb device:
+adb devices          # expect: <serial>  device
+adb shell id         # expect: uid=0(root)
+```
+
+If step 2 does not expose ADB, the firmware variant may require flashing a
+debug build or using a DIAG-port AT-command path (`AT+ZCDRUN=F`) to unlock
+shell. Rooting is device/firmware specific — verify `adb shell id` returns
+`uid=0` before proceeding.
+
+Once rooted, install `adb_persist.sh` (below) so the ADB composition survives
+reboots.
+
 ## Install
 
 On router (`/data` persists across reboots):
